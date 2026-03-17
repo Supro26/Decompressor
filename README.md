@@ -105,6 +105,9 @@ http://127.0.0.1:5000
    * Detect the final file
 4. Download the final decompressed file
 
+
+![alt text](/templates/ss.png "Ths is a sample output")
+
 ---
 
 ## 🧠 Example
