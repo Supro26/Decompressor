@@ -154,8 +154,7 @@ MAX_DEPTH = 50
 
 ## 💡 Future Improvements
 
-* Drag & drop file upload UI
-* Progress tracking (live extraction logs)
+* Drag & drop file upload UI (still on development)
 * Automatic flag detection (`flag{}` patterns)
 * Multi-file batch upload
 * Docker support
