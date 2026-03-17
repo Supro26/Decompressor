@@ -61,8 +61,8 @@ decompressor-webapp/
 ### 1. Clone the repository
 
 ```
-git clone https://github.com/your-username/decompressor-webapp.git
-cd decompressor-webapp
+git clone https://github.com/Supro26/Decompressor.git
+cd Decompressor
 ```
 
 ### 2. Install dependencies
