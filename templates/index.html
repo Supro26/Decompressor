@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Decompressor</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Variables ───────────────────────────────────────────── */
+    :root {
+      --bg:        #0d0d0d;
+      --surface:   #141414;
+      --border:    #2a2a2a;
+      --accent:    #c8f135;       /* sharp lime-green */
+      --accent-dim:#8aaa20;
+      --text:      #e8e8e8;
+      --muted:     #555;
+      --error:     #ff4d4d;
+      --radius:    6px;
+      --mono:      'Share Tech Mono', monospace;
+      --sans:      'Syne', sans-serif;
+    }
+
+    /* ── Reset ───────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+      /* subtle grid texture */
+      background-image:
+        linear-gradient(rgba(200,241,53,.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(200,241,53,.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* ── Card ────────────────────────────────────────────────── */
+    .card {
+      width: 100%;
+      max-width: 580px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      animation: fadeUp .5s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Card header ─────────────────────────────────────────── */
+    .card-header {
+      padding: 1.6rem 2rem 1.4rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .logo {
+      width: 36px;
+      height: 36px;
+      background: var(--accent);
+      border-radius: 4px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    .logo svg { display: block; }
+
+    .card-header h1 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -.02em;
+      color: var(--text);
+    }
+
+    .card-header p {
+      font-size: .75rem;
+      color: var(--muted);
+      font-family: var(--mono);
+      margin-top: .2rem;
+    }
+
+    /* ── Card body ───────────────────────────────────────────── */
+    .card-body { padding: 2rem; }
+
+    /* ── Drop zone ───────────────────────────────────────────── */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 2.4rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      position: relative;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(200,241,53,.04);
+    }
+
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .drop-icon {
+      font-size: 2rem;
+      margin-bottom: .6rem;
+      line-height: 1;
+    }
+
+    .drop-zone .primary-label {
+      font-size: .95rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .drop-zone .secondary-label {
+      font-size: .75rem;
+      color: var(--muted);
+      font-family: var(--mono);
+      margin-top: .3rem;
+    }
+
+    /* ── Selected file pill ──────────────────────────────────── */
+    #file-info {
+      display: none;
+      align-items: center;
+      gap: .6rem;
+      margin-top: 1rem;
+      padding: .6rem .9rem;
+      background: rgba(200,241,53,.07);
+      border: 1px solid rgba(200,241,53,.2);
+      border-radius: var(--radius);
+      font-family: var(--mono);
+      font-size: .78rem;
+      color: var(--accent);
+      word-break: break-all;
+    }
+
+    #file-info.visible { display: flex; }
+
+    #file-info .fi-icon { flex-shrink: 0; font-size: 1rem; }
+
+    #file-name { flex: 1; }
+
+    #clear-file {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 0 2px;
+      transition: color .15s;
+    }
+    #clear-file:hover { color: var(--error); }
+
+    /* ── Submit button ───────────────────────────────────────── */
+    .btn-submit {
+      margin-top: 1.4rem;
+      width: 100%;
+      padding: .85rem 1rem;
+      background: var(--accent);
+      color: #0d0d0d;
+      font-family: var(--sans);
+      font-size: .95rem;
+      font-weight: 800;
+      letter-spacing: .03em;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: background .2s, transform .1s;
+    }
+
+    .btn-submit:hover:not(:disabled) { background: #d8ff40; }
+    .btn-submit:active:not(:disabled) { transform: scale(.98); }
+
+    .btn-submit:disabled {
+      background: var(--border);
+      color: var(--muted);
+      cursor: not-allowed;
+    }
+
+    /* ── Progress / log panel ────────────────────────────────── */
+    #log-panel {
+      display: none;
+      margin-top: 1.6rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    #log-panel.visible { display: block; }
+
+    .log-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: .55rem .9rem;
+      background: #1a1a1a;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: .72rem;
+      color: var(--muted);
+    }
+
+    .log-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: .2; }
+    }
+
+    #log-panel.done .log-dot { animation: none; background: var(--accent); }
+
+    #log-output {
+      background: #0d0d0d;
+      padding: .9rem;
+      font-family: var(--mono);
+      font-size: .73rem;
+      line-height: 1.7;
+      color: #aaa;
+      max-height: 220px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    #log-output .line-plus  { color: var(--accent); }
+    #log-output .line-warn  { color: #f0a500; }
+    #log-output .line-error { color: var(--error); }
+    #log-output .line-sep   { color: var(--muted); }
+
+    /* ── Download button ─────────────────────────────────────── */
+    #download-btn {
+      display: none;
+      margin-top: 1.2rem;
+      width: 100%;
+      padding: .8rem 1rem;
+      background: transparent;
+      color: var(--accent);
+      font-family: var(--sans);
+      font-size: .9rem;
+      font-weight: 700;
+      border: 1.5px solid var(--accent);
+      border-radius: var(--radius);
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      transition: background .2s, color .2s;
+    }
+
+    #download-btn.visible { display: block; }
+    #download-btn:hover { background: var(--accent); color: #0d0d0d; }
+
+    /* ── Error banner ────────────────────────────────────────── */
+    #error-banner {
+      display: none;
+      margin-top: 1rem;
+      padding: .75rem 1rem;
+      background: rgba(255,77,77,.08);
+      border: 1px solid rgba(255,77,77,.3);
+      border-radius: var(--radius);
+      font-family: var(--mono);
+      font-size: .78rem;
+      color: var(--error);
+    }
+
+    #error-banner.visible { display: block; }
+
+    /* ── Footer ──────────────────────────────────────────────── */
+    footer {
+      margin-top: 2rem;
+      font-family: var(--mono);
+      font-size: .7rem;
+      color: var(--muted);
+      text-align: center;
+      animation: fadeUp .6s .3s ease both;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="card">
+
+    <!-- Header -->
+    <div class="card-header">
+      <div class="logo">
+        <!-- unzip icon -->
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+             stroke="#0d0d0d" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+      </div>
+      <div>
+        <h1>Decompressor</h1>
+        <p>Recursive archive extractor — zip · tar · gz · bz2 · xz</p>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div class="card-body">
+
+      <!-- Drop zone -->
+      <div class="drop-zone" id="drop-zone">
+        <input type="file" id="file-input" accept="*/*" />
+        <div class="drop-icon">📦</div>
+        <div class="primary-label">Drop your archive here</div>
+        <div class="secondary-label">or click to browse</div>
+      </div>
+
+      <!-- Selected file info -->
+      <div id="file-info">
+        <span class="fi-icon">📄</span>
+        <span id="file-name">—</span>
+        <button id="clear-file" title="Remove file">✕</button>
+      </div>
+
+      <!-- Submit -->
+      <button class="btn-submit" id="submit-btn" disabled>
+        Decompress
+      </button>
+
+      <!-- Error banner -->
+      <div id="error-banner"></div>
+
+      <!-- Log panel -->
+      <div id="log-panel">
+        <div class="log-header">
+          <span id="log-status">Processing…</span>
+          <div class="log-dot" id="log-dot"></div>
+        </div>
+        <div id="log-output"></div>
+      </div>
+
+      <!-- Download link -->
+      <a id="download-btn" href="#" download="decompressed_result.zip">
+        ⬇ Download Result
+      </a>
+
+    </div>
+  </div>
+
+
+  <script>
+    /* ── Element refs ──────────────────────────────────────────── */
+    const dropZone    = document.getElementById('drop-zone');
+    const fileInput   = document.getElementById('file-input');
+    const fileInfo    = document.getElementById('file-info');
+    const fileName    = document.getElementById('file-name');
+    const clearBtn    = document.getElementById('clear-file');
+    const submitBtn   = document.getElementById('submit-btn');
+    const logPanel    = document.getElementById('log-panel');
+    const logOutput   = document.getElementById('log-output');
+    const logStatus   = document.getElementById('log-status');
+    const downloadBtn = document.getElementById('download-btn');
+    const errorBanner = document.getElementById('error-banner');
+
+    /* ── Drag-and-drop visual feedback ─────────────────────────── */
+    dropZone.addEventListener('dragover', e => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    ['dragleave', 'drop'].forEach(evt =>
+      dropZone.addEventListener(evt, () => dropZone.classList.remove('dragover'))
+    );
+
+    // dropZone.addEventListener('drop', e => {
+    //   e.preventDefault();
+    //   const files = e.dataTransfer.files;
+    //   if (files.length) setFile(files[0]);
+    // });
+    dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const files = e.dataTransfer.files;
+  if (!files.length) return;
+  const dt = new DataTransfer();
+  dt.items.add(files[0]);
+  fileInput.files = dt.files;  
+
+  setFile(files[0]);
+});
+
+    /* ── File selection ─────────────────────────────────────────── */
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) setFile(fileInput.files[0]);
+    });
+
+    function setFile(file) {
+      fileName.textContent = file.name;
+      fileInfo.classList.add('visible');
+      submitBtn.disabled = false;
+      resetUI();
+    }
+
+    clearBtn.addEventListener('click', () => {
+      fileInput.value = '';
+      fileInfo.classList.remove('visible');
+      fileName.textContent = '—';
+      submitBtn.disabled = true;
+      resetUI();
+    });
+
+    /* ── Reset UI state ─────────────────────────────────────────── */
+    function resetUI() {
+      logPanel.classList.remove('visible', 'done');
+      logOutput.innerHTML = '';
+      logStatus.textContent = 'Processing…';
+      downloadBtn.classList.remove('visible');
+      downloadBtn.href = '#';
+      errorBanner.classList.remove('visible');
+      errorBanner.textContent = '';
+    }
+
+    /* ── Colour-code a single log line ──────────────────────────── */
+    function appendLogLine(text) {
+      const span = document.createElement('span');
+      if (text.startsWith('[+]'))      span.className = 'line-plus';
+      else if (text.startsWith('[!]')) span.className = 'line-warn';
+      else if (text.startsWith('[-]')) span.className = 'line-error';
+      else if (text.startsWith('──')) span.className = 'line-sep';
+      span.textContent = text + '\n';
+      logOutput.appendChild(span);
+      logOutput.scrollTop = logOutput.scrollHeight;
+    }
+
+    /* ── Submit ─────────────────────────────────────────────────── */
+    submitBtn.addEventListener('click', async () => {
+      if (!fileInput.files.length) return;
+
+      resetUI();
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Processing…';
+      logPanel.classList.add('visible');
+
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+
+      try {
+        /* Call the JSON log endpoint first to get progress lines */
+        const logRes = await fetch('/upload/log', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const data = await logRes.json();
+
+        if (!logRes.ok || data.error) {
+          throw new Error(data.error || 'Server error');
+        }
+
+        /* Render log lines */
+        (data.log || []).forEach(appendLogLine);
+
+        /* Fetch the actual file using the session download URL */
+        const fileRes = await fetch(data.download_url);
+        if (!fileRes.ok) throw new Error('Could not fetch result file.');
+
+        const blob = await fileRes.blob();
+        const objUrl = URL.createObjectURL(blob);
+
+        downloadBtn.href = objUrl;
+        downloadBtn.classList.add('visible');
+
+        logPanel.classList.add('done');
+        logStatus.textContent = 'Done';
+
+      } catch (err) {
+        errorBanner.textContent = '⚠ ' + err.message;
+        errorBanner.classList.add('visible');
+        logPanel.classList.add('done');
+        logStatus.textContent = 'Failed';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Decompress';
+      }
+    });
+  </script>
+
+</body>
+</html>
