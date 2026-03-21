@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""
-app.py
-------
-Flask web application for the recursive decompressor.
-Handles file uploads, triggers decompression, and serves the result as a download.
-"""
 
 import os
 import uuid
@@ -16,9 +10,6 @@ from flask import (
 )
 from decompressor import recursive_decompress
 
-# ─────────────────────────────────────────────
-# App configuration
-# ─────────────────────────────────────────────
 
 app = Flask(__name__)
 
@@ -34,10 +25,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(EXTRACT_FOLDER, exist_ok=True)
 
 
-# ─────────────────────────────────────────────
-# Routes
-# ─────────────────────────────────────────────
-
 @app.route("/")
 def index():
     """Render the upload page."""
@@ -46,10 +33,7 @@ def index():
 
 @app.route("/upload", methods=["POST"])
 def upload():
-    """
-    Accepts a file upload, runs recursive decompression,
-    zips the final output, and returns it as a download.
-    """
+
     if "file" not in request.files:
         return jsonify({"error": "No file part in the request."}), 400
 
@@ -101,11 +85,9 @@ def upload():
 
 @app.route("/upload/log", methods=["POST"])
 def upload_log():
-    """
-    Same as /upload but returns JSON progress log instead of a file,
-    useful for the frontend to show live-ish feedback before download.
-    Not used for the actual download flow — kept as a utility endpoint.
-    """
+
+    #Same as /upload but returns JSON progress log 
+
     if "file" not in request.files:
         return jsonify({"error": "No file part."}), 400
 
@@ -142,8 +124,8 @@ def upload_log():
 
 @app.route("/download/<session_id>")
 def download(session_id: str):
-    """Serve the pre-built result ZIP for a given session."""
     # Basic validation — session_id must be a hex string
+
     if not session_id.isalnum():
         return jsonify({"error": "Invalid session id."}), 400
 
@@ -160,15 +142,9 @@ def download(session_id: str):
     )
 
 
-# ─────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────
 
 def _zip_directory(source_dir: str, output_zip_path: str) -> None:
-    """
-    Recursively zip all contents of source_dir into output_zip_path.
-    Paths inside the ZIP are relative to source_dir.
-    """
+
     with zipfile.ZipFile(output_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for root, _dirs, files in os.walk(source_dir):
             for fname in files:
@@ -177,9 +153,6 @@ def _zip_directory(source_dir: str, output_zip_path: str) -> None:
                 zf.write(abs_path, rel_path)
 
 
-# ─────────────────────────────────────────────
-# Entry point
-# ─────────────────────────────────────────────
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)

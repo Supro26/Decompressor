@@ -1,18 +1,4 @@
 #!/usr/bin/env python3
-"""
-decompressor.py
----------------
-Core recursive decompression engine used by the Flask app.
-
-Supported formats (detected via magic bytes, NOT file extensions):
-    zip, tar (all variants), gzip, bzip2, xz
-
-Public API:
-    recursive_decompress(input_path, output_dir) -> list[str]
-        Copies input_path into output_dir and recursively extracts
-        every archive found until none remain.
-        Returns a list of log lines describing what was done.
-"""
 
 import os
 import shutil
@@ -29,19 +15,13 @@ except ImportError:
     raise ImportError("python-magic is required. Run: pip install python-magic")
 
 
-# ─────────────────────────────────────────────
-# Constants
-# ─────────────────────────────────────────────
 
 MAX_DEPTH = 50   # maximum extraction passes (zip-bomb protection)
 
 
-# ─────────────────────────────────────────────
-# Internal logger
-# ─────────────────────────────────────────────
 
 class _Logger:
-    """Collects log lines and optionally prints them."""
+    #Collects log lines and optionally prints them
 
     def __init__(self):
         self.lines: list[str] = []
@@ -67,11 +47,6 @@ class _Logger:
         print(line)
 
 
-# ─────────────────────────────────────────────
-# File-type detection
-# ─────────────────────────────────────────────
-
-# MIME type → canonical archive-type string
 _MIME_MAP: dict[str, str] = {
     "application/zip"              : "zip",
     "application/x-zip-compressed" : "zip",
@@ -82,7 +57,7 @@ _MIME_MAP: dict[str, str] = {
     "application/x-xz"             : "xz",
 }
 
-# Substrings in the human-readable magic description → archive type
+# Substrings in the human-readable magic description i.e. archive type
 _DESC_MAP: list[tuple[str, str]] = [
     ("zip archive",    "zip"),
     ("tar archive",    "tar"),
@@ -94,12 +69,8 @@ _DESC_MAP: list[tuple[str, str]] = [
 
 
 def detect_file_type(filepath: str) -> str | None:
-    """
-    Inspect *filepath* using magic bytes and return its archive type.
+    #use of magic to get filepath
 
-    Returns one of: 'zip', 'tar', 'gzip', 'bzip2', 'xz'
-    Returns None if the file is not a recognised archive.
-    """
     try:
         mime = magic.from_file(filepath, mime=True)
     except Exception:
@@ -122,9 +93,6 @@ def detect_file_type(filepath: str) -> str | None:
     return archive_type
 
 
-# ─────────────────────────────────────────────
-# Format-specific extractors
-# ─────────────────────────────────────────────
 
 def _safe_extract_zip(archive_path: str, dest_dir: str) -> None:
     """
@@ -140,17 +108,16 @@ def _safe_extract_zip(archive_path: str, dest_dir: str) -> None:
 
 
 def _safe_extract_tar(archive_path: str, dest_dir: str) -> None:
-    """
-    Extract a TAR archive (plain / gz / bz2 / xz) into dest_dir.
-    Filters out path-traversal entries before extraction.
-    """
+
+    #Extract a TAR archive (plain / gz / bz2 / xz) into dest_dir.
+
     with tarfile.open(archive_path, "r:*") as tf:
         safe_members = [
             m for m in tf.getmembers()
             if not pathlib.Path(m.name).is_absolute()
             and ".." not in pathlib.Path(m.name).parts
         ]
-        # 'filter' keyword was added in Python 3.12 — use it when available
+        # 'filter' 
         try:
             tf.extractall(dest_dir, members=safe_members, filter="data")
         except TypeError:
@@ -158,12 +125,9 @@ def _safe_extract_tar(archive_path: str, dest_dir: str) -> None:
 
 
 def _decompress_stream(archive_path: str, dest_dir: str, archive_type: str) -> None:
-    """
-    Decompress a single-stream format (gzip / bzip2 / xz) into dest_dir.
+    
+    #Decompress a single-stream format (gzip / bzip2 / xz) into dest_dir.
 
-    Output filename = archive stem (e.g. 'data.gz' → 'data').
-    Falls back to '<original_name>.out' if no stem can be determined.
-    """
     base = os.path.basename(archive_path)
     stem, _ = os.path.splitext(base)
     out_name = stem if stem else base + ".out"
@@ -180,24 +144,15 @@ def _decompress_stream(archive_path: str, dest_dir: str, archive_type: str) -> N
         shutil.copyfileobj(src, dst)
 
 
-# ─────────────────────────────────────────────
-# Public extraction dispatcher
-# ─────────────────────────────────────────────
-
 def extract_archive(
     archive_path : str,
     dest_dir     : str,
     archive_type : str,
     logger       : _Logger,
 ) -> bool:
-    """
-    Extract *archive_path* (of known *archive_type*) into *dest_dir*.
+    
+    #Extract archive_path(of known archive_type) into dest_dir
 
-    For gzip / bzip2 / xz files, first checks whether the payload is a
-    TAR stream (i.e. .tar.gz style) and uses the TAR extractor if so.
-
-    Returns True on success, False on failure.
-    """
     os.makedirs(dest_dir, exist_ok=True)
 
     try:
@@ -225,9 +180,8 @@ def extract_archive(
         return False
 
 
-# ─────────────────────────────────────────────
+
 # Directory scanner
-# ─────────────────────────────────────────────
 
 def find_archives(search_dir: str) -> list[str]:
     """
@@ -243,44 +197,19 @@ def find_archives(search_dir: str) -> list[str]:
     return archives
 
 
-# ─────────────────────────────────────────────
-# Main public function
-# ─────────────────────────────────────────────
 
 def recursive_decompress(input_path: str, output_dir: str) -> list[str]:
-    """
-    Recursively decompress *input_path* into *output_dir*.
 
-    Algorithm
-    ---------
-    1. Copy the initial archive into output_dir.
-    2. Scan output_dir for archive files (magic-byte detection).
-    3. Extract each archive into its containing directory.
-    4. Delete the archive after successful extraction.
-    5. Repeat from step 2 until no archives remain or MAX_DEPTH is hit.
-
-    Parameters
-    ----------
-    input_path : str
-        Path to the initial archive file.
-    output_dir : str
-        Directory to extract everything into (created if absent).
-
-    Returns
-    -------
-    list[str]
-        Human-readable log lines describing every action taken.
-    """
     logger = _Logger()
 
-    # ── Setup ─────────────────────────────────────────────────────────────
+    #  Setup 
     os.makedirs(output_dir, exist_ok=True)
 
     dest_start = os.path.join(output_dir, os.path.basename(input_path))
     shutil.copy2(input_path, dest_start)
     logger.info(f"Copied '{os.path.basename(input_path)}' into working directory.")
 
-    # ── Iterative extraction loop ─────────────────────────────────────────
+    # Iterative extraction loop 
     for depth in range(1, MAX_DEPTH + 1):
 
         archives = find_archives(output_dir)
@@ -326,7 +255,7 @@ def recursive_decompress(input_path: str, output_dir: str) -> list[str]:
             "Possible zip-bomb or deeply nested archive — stopping."
         )
 
-    # ── Bonus: collect .txt file contents for the log ─────────────────────
+    # Bonus: collect .txt file contents for the log
     txt_files = _find_txt_files(output_dir)
     if txt_files:
         logger.separator("Text files found")
@@ -345,9 +274,8 @@ def recursive_decompress(input_path: str, output_dir: str) -> list[str]:
     return logger.lines
 
 
-# ─────────────────────────────────────────────
+
 # Internal helpers
-# ─────────────────────────────────────────────
 
 def _find_txt_files(search_dir: str) -> list[str]:
     """Return paths of all .txt files under search_dir."""
